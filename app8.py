@@ -80,18 +80,23 @@ def feature_extraction(uploaded_files):
         except Exception as e:
             st.error("Ocurrió un error. Detalles: " + str(e))
 
-@st.cache
 def mostrar_imagen(label, uploaded_files):
-    # Obtener la lista de nombres de archivos cargados
-    nombres_archivos = [os.path.splitext(file.name)[0] for file in uploaded_files]
+    # Obtener el directorio donde se cargaron las imágenes
+    directorio_cargado = os.path.dirname(uploaded_files[0].name) if uploaded_files else None
 
-    # Buscar la imagen correspondiente en los archivos cargados
-    if label in nombres_archivos:
-        idx = nombres_archivos.index(label)
-        img = Image.open(uploaded_files[idx])
-        st.image(img, width=200)
+    if directorio_cargado:
+        # Obtener la lista de nombres de archivos en el directorio
+        nombres_archivos = [os.path.splitext(file.name)[0] for file in os.listdir(directorio_cargado) if os.path.isfile(os.path.join(directorio_cargado, file))]
+
+        # Buscar la imagen correspondiente en los archivos del directorio
+        if label in nombres_archivos:
+            img_path = os.path.join(directorio_cargado, label)
+            img = Image.open(img_path)
+            st.image(img, width=200)
+        else:
+            st.warning(f"No se encontró la imagen correspondiente a la etiqueta: {label}")
     else:
-        st.warning(f"No se encontró la imagen correspondiente a la etiqueta: {label}")
+        st.warning("No se proporcionó ningún directorio de imágenes.")
 
 
 def upload_and_process_image(uploaded_file, pkl_file):
