@@ -110,6 +110,7 @@ def upload_and_process_image(uploaded_file, pkl_file):
         image_embedding = _models.embedding(_models.mtcnn(img))
 
         result = _models.Distancia(image_embedding)
+        st.write("resultado:", result)
         if result:
             label, distance, path = result
             st.image(img, width=200)
