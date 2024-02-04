@@ -86,7 +86,7 @@ def mostrar_imagen(label, uploaded_files):
     # Buscar la imagen correspondiente en los archivos cargados
     for uploaded_file in uploaded_files:
         if os.path.splitext(uploaded_file.name)[0] == label:
-            img = Image.open(uploaded_file)
+            img = Image.open(os.path.splitext(uploaded_file.name))
             st.image(img, width=200)
             break
 
