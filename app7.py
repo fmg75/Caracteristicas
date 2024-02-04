@@ -80,16 +80,6 @@ def feature_extraction(uploaded_files):
         except Exception as e:
             st.error("Ocurrió un error. Detalles: " + str(e))
 
-def mostrar_imagen(label, uploaded_files):
-    st.write(f"Imagen correspondiente a la etiqueta: {label}")
-    
-    # Buscar la imagen correspondiente en los archivos cargados
-    for uploaded_file in uploaded_files:
-        if os.path.splitext(uploaded_file.name)[0] == label:
-            img = Image.open(uploaded_file)
-            st.image(img, width=200)
-            break
-
 def upload_and_process_image(uploaded_file, pkl_file):
     try:
         _models = FaceNetModels()
@@ -118,9 +108,6 @@ def upload_and_process_image(uploaded_file, pkl_file):
             st.image(img, width=200)
             st.write("La imagen cargada puede ser de:", label)
             st.write("% Similitud: ", int(100- 17.14*distance))
-            
-            mostrar_imagen(label, uploaded_files)
-
     
         else:
             st.write(
