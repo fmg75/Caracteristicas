@@ -80,15 +80,19 @@ def feature_extraction(uploaded_files):
         except Exception as e:
             st.error("Ocurrió un error. Detalles: " + str(e))
 
+@st.cache
 def mostrar_imagen(label, uploaded_files):
-    #st.write(f"Imagen correspondiente a la etiqueta: {label}")
-    
+    # Obtener la lista de nombres de archivos cargados
+    nombres_archivos = [os.path.splitext(file.name)[0] for file in uploaded_files]
+
     # Buscar la imagen correspondiente en los archivos cargados
-    for uploaded_file in uploaded_files:
-        if os.path.splitext(uploaded_file.name)[0] == label:
-            img = Image.open(os.path.splitext(uploaded_file.name))
-            st.image(img, width=200)
-            break
+    if label in nombres_archivos:
+        idx = nombres_archivos.index(label)
+        img = Image.open(uploaded_files[idx])
+        st.image(img, width=200)
+    else:
+        st.warning(f"No se encontró la imagen correspondiente a la etiqueta: {label}")
+
 
 def upload_and_process_image(uploaded_file, pkl_file):
     try:
@@ -117,7 +121,7 @@ def upload_and_process_image(uploaded_file, pkl_file):
             label, distance = result
             st.image(img, width=200)
             st.write("La imagen cargada puede ser de:", label)
-            #mostrar_imagen(label, pkl_file_path)
+            mostrar_imagen(label, uploaded_files)
             st.write("% Similitud: ", int(100- 17.14*distance))
     
         else:
