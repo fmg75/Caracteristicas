@@ -12,7 +12,6 @@ import tempfile
 # Generar un ID único utilizando uuid
 unique_id = str(uuid.uuid4())[:8]
 
-
 class FaceNetModels:
     def __init__(self):
         self.model = InceptionResnetV1(pretrained="vggface2").eval()
@@ -41,7 +40,7 @@ class FaceNetModels:
         no_process_images = []
 
         for uploaded_file in uploaded_files:
-            img_path = uploaded_file.name
+            
             img = Image.open(uploaded_file)
             img = img.convert("RGB")
             label = os.path.splitext(uploaded_file.name)[0]
@@ -55,7 +54,6 @@ class FaceNetModels:
             labels.append(label)
 
         self.caracteristicas = dict(zip(labels, embeddings_list))
-
         st.write(f"Se procesaron {len(embeddings_list)} imágenes.")
 
         if no_process_images:
@@ -63,8 +61,7 @@ class FaceNetModels:
 
         return self.caracteristicas
 
-
-def run_feature_extraction(uploaded_files):
+def feature_extraction(uploaded_files):
     _models = FaceNetModels()
     if st.button("Extraer características"):
         try:
@@ -79,12 +76,19 @@ def run_feature_extraction(uploaded_files):
                 base64_encoded = base64.b64encode(contents).decode("utf-8")
                 download_path = f"data:application/octet-stream;base64,{base64_encoded}"
                 href = f'<a href="{download_path}" download="feature_{unique_id}.pkl">Descargar Características</a>'
-
             st.markdown(href, unsafe_allow_html=True)
-
         except Exception as e:
             st.error("Ocurrió un error. Detalles: " + str(e))
 
+def mostrar_imagen(label, uploaded_files):
+    st.write(f"Imagen correspondiente a la etiqueta: {label}")
+    
+    # Buscar la imagen correspondiente en los archivos cargados
+    for uploaded_file in uploaded_files:
+        if os.path.splitext(uploaded_file.name)[0] == label:
+            img = Image.open(uploaded_file)
+            st.image(img, width=200)
+            break
 
 def upload_and_process_image(uploaded_file, pkl_file):
     try:
@@ -113,79 +117,41 @@ def upload_and_process_image(uploaded_file, pkl_file):
             label, distance = result
             st.image(img, width=200)
             st.write("La imagen cargada puede ser de:", label)
-            st.write("Distancia Euclidiana: ", round(distance, 4))
+            st.write("% Similitud: ", int(100- 17.14*distance))
+            
+            mostrar_imagen(label, uploaded_files)
 
-            show_recognized_face(label, dir_img)
-
-            # img_files = os.listdir(data_dir)
-            # st.write(str(img_files))
-
-            # for img_file in img_files:
-            #     img_path = os.path.join(data_dir, img_file)
-            #     img_label = os.path.splitext(img_file)[0]
-            #     if (
-            #         img_label == label
-            #     ):  # Comparación de etiquetas sin distinción de mayúsculas y minúsculas
-            #         image = Image.open(img_path)
-            #         st.image(image, caption="Imagen del rostro reconocido", width=200)
-            #     # return
-
-            # st.write("No se encontró la imagen correspondiente al rostro reconocido.")
-
+    
         else:
             st.write(
-                "Algo falló con la imagen proporcionada. Verifica si la ruta del diccionario de Caracteristicas es correcta "
-                + "O si el mismo ha sido generado previamente."
-            )
+                "Algo falló con la imagen proporcionada. Verifica si la imagen tiene una extension valida EJ: luis.jpg"
+                + "O si el mismo ha sido generado previamente.")
 
     except Exception as e:
         print("Error en upload_and_process_image:", str(e))
         return None
 
-
-def show_recognized_face(label, dir):
-    img_files = os.listdir(dir)
-
-    for img_file in img_files:
-        img_path = os.path.join(dir, img_file)
-        img_label = os.path.splitext(img_file)[0]
-        if (
-            img_label == label
-        ):  # Comparación de etiquetas sin distinción de mayúsculas y minúsculas
-            image = Image.open(img_path)
-            st.image(image, caption="Imagen del rostro reconocido", width=200)
-            return
-
-    st.write("No se encontró la imagen correspondiente al rostro reconocido.")
-
-
 # Interface lateral
-
 expander = st.expander("Información de la App")
 with expander:
-    st.write("Esta es una aplicación de reconocimiento facial.")
     st.write(
-        "Permite extraer características faciales, guardarlas en un archivo (diccionario con extencion .pkl) y luego reconocer el rostro en una imagen."
-    )
+    "Esta es una aplicación de reconocimiento facial.")
     st.write(
-        "Para generar características faciales, selecciona la opción 'Generar características' en el menú lateral y especifica el directorio de trabajo donde se alojan las imagenes."
-    )
+    "Permite extraer características faciales, guardarlas en un archivo (diccionario con extencion .pkl) y luego reconocer el rostro en una imagen.")
     st.write(
-        "Una vez generadas las características, puedes cargar el diccionario .pkl y una imagen para realizar el reconocimiento facial."
-    )
+    "Para generar características faciales, selecciona la opción 'Generar características' en el menú lateral.")
+    st.write(
+    "El conjunto de imagenes seleccionadas debe ser del tipo: Juan.jpg, Laura.jpeg, etc..")
+    st.write(
+    "Una vez generadas las características, puedes cargar el diccionario .pkl y una imagen para realizar el reconocimiento facial.")
 
-
-dir_img = st.sidebar.text_input("Directorio de imagenes")
-
-# st.sidebar.title("Opciones")
 option = st.sidebar.selectbox(
     "Seleccione una opción:",
-    ("Generar características", "Cargar diccionario y reconocer"),
-)
+    ("Generar características", "Cargar diccionario y reconocer"),)
 
 if option == "Generar características":
     uploaded_files = st.file_uploader("Cargar imágenes", accept_multiple_files=True)
-    run_feature_extraction(uploaded_files)
+    feature_extraction(uploaded_files)
 elif option == "Cargar diccionario y reconocer":
     # data_dir = st.sidebar.text_input("Directorio de trabajo")
     pkl_file = st.file_uploader("Cargar archivo .pkl")
