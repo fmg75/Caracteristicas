@@ -27,16 +27,18 @@ class FaceNetModels:
         return img_embedding
 
     def Distancia(self, img_embedding):
-        distances = [(label, path, torch.dist(emb, img_embedding))
+        distances = [
+            (label, path, torch.dist(emb, img_embedding))
             for label, emb, path in zip(
-                self.caracteristicas["labels"],
-                self.caracteristicas["embeddings"],
-                self.caracteristicas["paths"].values()
+            self.caracteristicas.keys(),
+            self.caracteristicas.values(),
+            self.caracteristicas.values()
             )
         ]
-
         sorted_distances = sorted(distances, key=lambda x: x[2])
-        return sorted_distances[0][0], sorted_distances[0][1].item(), sorted_distances[0][2]
+        #          label                  patch                  distance
+        return sorted_distances[0][0], sorted_distances[0][1], sorted_distances[0][2].item()
+
 
     def extract_embeddings(self, uploaded_files):
         embeddings_list = []
@@ -58,7 +60,7 @@ class FaceNetModels:
             labels.append(label)
             path_uploaded_files.append(uploaded_file.name)
 
-        self.caracteristicas = dict(zip(labels, embeddings_list,path_uploaded_files))
+        self.caracteristicas = dict(zip(labels, embeddings_list, path_uploaded_files))
         st.write(f"Se procesaron {len(embeddings_list)} imágenes.")
 
         if no_process_images:
@@ -112,7 +114,7 @@ def upload_and_process_image(uploaded_file, pkl_file):
         result = _models.Distancia(image_embedding)
         st.write("resultado:", result)
         if result:
-            label, distance, path = result
+            label, path, distance = result
             st.image(img, width=200)
             st.write("La imagen cargada puede ser de:", label)
             st.write("patch:", path)
