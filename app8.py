@@ -37,7 +37,7 @@ class FaceNetModels:
         ]
         sorted_distances = sorted(distances, key=lambda x: x[2])
         #          label                  patch                  distance
-        return sorted_distances[0][0], sorted_distances[0][1], sorted_distances[0][2].item()
+        return sorted_distances[0] if sorted_distances else None
 
 
     def extract_embeddings(self, uploaded_files):
