@@ -28,16 +28,16 @@ class FaceNetModels:
 
     def Distancia(self, img_embedding):
         distances = [
-            (label, path, torch.dist(emb, img_embedding))
+            (label, path, torch.dist(emb, img_embedding).item())
             for label, emb, path in zip(
             self.caracteristicas.keys(),
             self.caracteristicas.values(),
             self.caracteristicas.values()
-            )
-        ]
+        )
+    ]
         sorted_distances = sorted(distances, key=lambda x: x[2])
-        #          label                  patch                  distance
         return sorted_distances[0] if sorted_distances else None
+
 
 
     def extract_embeddings(self, uploaded_files):
