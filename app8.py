@@ -100,6 +100,7 @@ def upload_and_process_image(uploaded_file, pkl_file):
             pkl_file_path = temp_pkl.name
 
         _models.load_caracteristicas(pkl_file_path)
+        print("Contenido del .pkl:", _models.caracteristicas)
 
         img = Image.open(io.BytesIO(uploaded_file.read()))
 
