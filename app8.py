@@ -27,20 +27,24 @@ class FaceNetModels:
         return img_embedding
 
     def Distancia(self, img_embedding):
-        distances = [
-            (label, torch.dist(emb, img_embedding))
-            for label, emb in self.caracteristicas.items()
+        distances = [(label, path, torch.dist(emb, img_embedding))
+            for label, emb, path in zip(
+                self.caracteristicas["labels"],
+                self.caracteristicas["embeddings"],
+                self.caracteristicas["paths"].values()
+            )
         ]
-        sorted_distances = sorted(distances, key=lambda x: x[1])
-        return sorted_distances[0][0], sorted_distances[0][1].item()
+
+        sorted_distances = sorted(distances, key=lambda x: x[2])
+        return sorted_distances[0][0], sorted_distances[0][1].item(), sorted_distances[0][2]
 
     def extract_embeddings(self, uploaded_files):
         embeddings_list = []
         labels = []
         no_process_images = []
+        path_uploaded_files = {}
 
         for uploaded_file in uploaded_files:
-            
             img = Image.open(uploaded_file)
             img = img.convert("RGB")
             label = os.path.splitext(uploaded_file.name)[0]
@@ -52,8 +56,9 @@ class FaceNetModels:
 
             embeddings_list.append(self.model(face.unsqueeze(0)))
             labels.append(label)
+            path_uploaded_files[label] = uploaded_file.name
 
-        self.caracteristicas = dict(zip(labels, embeddings_list))
+        self.caracteristicas = {"labels": labels, "embeddings": embeddings_list, "paths": path_uploaded_files}
         st.write(f"Se procesaron {len(embeddings_list)} imágenes.")
 
         if no_process_images:
@@ -80,23 +85,6 @@ def feature_extraction(uploaded_files):
         except Exception as e:
             st.error("Ocurrió un error. Detalles: " + str(e))
 
-def mostrar_imagen(label, uploaded_files):
-    # Obtener el directorio donde se cargaron las imágenes
-    directorio_cargado = os.path.dirname(uploaded_files[0].name) if uploaded_files else None
-
-    if directorio_cargado:
-        # Obtener la lista de nombres de archivos en el directorio
-        nombres_archivos = [os.path.splitext(file.name)[0] for file in os.listdir(directorio_cargado) if os.path.isfile(os.path.join(directorio_cargado, file))]
-
-        # Buscar la imagen correspondiente en los archivos del directorio
-        if label in nombres_archivos:
-            img_path = os.path.join(directorio_cargado, label)
-            img = Image.open(img_path)
-            st.image(img, width=200)
-        else:
-            st.warning(f"No se encontró la imagen correspondiente a la etiqueta: {label}")
-    else:
-        st.warning("No se proporcionó ningún directorio de imágenes.")
 
 
 def upload_and_process_image(uploaded_file, pkl_file):
@@ -123,10 +111,10 @@ def upload_and_process_image(uploaded_file, pkl_file):
 
         result = _models.Distancia(image_embedding)
         if result:
-            label, distance = result
+            label, distance, path = result
             st.image(img, width=200)
             st.write("La imagen cargada puede ser de:", label)
-            mostrar_imagen(label, uploaded_files)
+            st.write("patch:", path)
             st.write("% Similitud: ", int(100- 17.14*distance))
     
         else:
