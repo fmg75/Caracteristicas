@@ -151,7 +151,7 @@ if option == "Generar características":
     uploaded_files = st.file_uploader("Cargar imágenes", accept_multiple_files=True)
     feature_extraction(uploaded_files)
 elif option == "Cargar diccionario y reconocer":
-    # data_dir = st.sidebar.text_input("Directorio de trabajo")
+   
     pkl_file = st.file_uploader("Cargar archivo .pkl")
     uploaded_file = st.file_uploader("Cargar imagen a reconocer")
     if pkl_file and uploaded_file:
