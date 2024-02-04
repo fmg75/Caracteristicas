@@ -81,7 +81,7 @@ def feature_extraction(uploaded_files):
             st.error("Ocurrió un error. Detalles: " + str(e))
 
 def mostrar_imagen(label, uploaded_files):
-    st.write(f"Imagen correspondiente a la etiqueta: {label}")
+    #st.write(f"Imagen correspondiente a la etiqueta: {label}")
     
     # Buscar la imagen correspondiente en los archivos cargados
     for uploaded_file in uploaded_files:
@@ -117,10 +117,8 @@ def upload_and_process_image(uploaded_file, pkl_file):
             label, distance = result
             st.image(img, width=200)
             st.write("La imagen cargada puede ser de:", label)
-            st.write("% Similitud: ", int(100- 17.14*distance))
-            
             mostrar_imagen(label, uploaded_files)
-
+            st.write("% Similitud: ", int(100- 17.14*distance))
     
         else:
             st.write(
