@@ -60,7 +60,8 @@ class FaceNetModels:
             labels.append(label)
             path_uploaded_files.append(uploaded_file.name)
 
-        self.caracteristicas = dict(zip(labels, embeddings_list, path_uploaded_files))
+        self.caracteristicas = dict(zip(labels, zip(embeddings_list, path_uploaded_files)))
+
         st.write(f"Se procesaron {len(embeddings_list)} imágenes.")
 
         if no_process_images:
