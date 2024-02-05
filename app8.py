@@ -53,8 +53,13 @@ class FaceNetModels:
 
             embeddings_list.append(self.model(face.unsqueeze(0)))
             labels.append(label)
-            path_uploaded_files.append(os.path(uploaded_file))
-            os.path(uploaded_file)    
+
+            # Guardar temporalmente el archivo y obtener la ruta completa
+            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp_img:
+                temp_img_path = temp_img.name
+                img.save(temp_img_path)
+                path_uploaded_files.append(temp_img_path)
+
         self.caracteristicas = dict(zip(labels, zip(path_uploaded_files, embeddings_list)))
 
         st.write(f"Se procesaron {len(embeddings_list)} imágenes.")
@@ -63,6 +68,7 @@ class FaceNetModels:
             st.warning(f"No se pudieron procesar {len(no_process_images)} imágenes.")
 
         return self.caracteristicas
+
 
 def feature_extraction(uploaded_files):
     _models = FaceNetModels()
