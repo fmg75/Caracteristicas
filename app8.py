@@ -63,6 +63,8 @@ class FaceNetModels:
 # Agregar un diccionario para almacenar en caché las imágenes cargadas
 image_cache = {}
 
+
+@st.cache_data(persist=True)
 def feature_extraction(uploaded_files):
     global image_cache  # Acceder a la variable global
 
@@ -92,6 +94,7 @@ def feature_extraction(uploaded_files):
         except Exception as e:
             st.error("Ocurrió un error. Detalles: " + str(e))
 
+@st.cache_data(persist=True)
 def upload_and_process_image(uploaded_file, pkl_file):
     global image_cache  # Acceder a la variable global
     
