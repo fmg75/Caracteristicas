@@ -60,14 +60,8 @@ class FaceNetModels:
             st.warning(f"No se pudieron procesar {len(no_process_images)} imágenes.")
 
         return self.caracteristicas
-# Agregar un diccionario para almacenar en caché las imágenes cargadas
-image_cache = {}
 
-
-@st.cache_data(persist=True)
 def feature_extraction(uploaded_files):
-    global image_cache  # Acceder a la variable global
-
     _models = FaceNetModels()
     if st.button("Extraer características"):
         try:
@@ -83,21 +77,10 @@ def feature_extraction(uploaded_files):
                 download_path = f"data:application/octet-stream;base64,{base64_encoded}"
                 href = f'<a href="{download_path}" download="feature_{unique_id}.pkl">Descargar Características</a>'
             st.markdown(href, unsafe_allow_html=True)
-            
-            # Almacenar en caché las imágenes cargadas
-            for uploaded_file in uploaded_files:
-                img = Image.open(uploaded_file)
-                img = img.convert("RGB")
-                label = os.path.splitext(uploaded_file.name)[0]
-                image_cache[label] = img
-
         except Exception as e:
             st.error("Ocurrió un error. Detalles: " + str(e))
 
-@st.cache_data(persist=True)
 def upload_and_process_image(uploaded_file, pkl_file):
-    global image_cache  # Acceder a la variable global
-    
     try:
         _models = FaceNetModels()
 
@@ -120,19 +103,11 @@ def upload_and_process_image(uploaded_file, pkl_file):
         image_embedding = _models.embedding(_models.mtcnn(img))
 
         result = _models.Distancia(image_embedding)
-
         if result:
             label, distance = result
-
-            # Obtener la imagen desde el caché utilizando el label
-            img = image_cache.get(label)
-            if img is not None:
-                # Mostrar la imagen y la información
-                    st.image(img, width=200)
-                    st.write("La imagen cargada puede ser de:", label)
-                    st.write("% Similitud: ", int(100 - 17.14 * distance))
-            else:
-                    st.warning("La imagen correspondiente al label no está en caché.")
+            st.image(img, width=200)
+            st.write("La imagen cargada puede ser de:", label)
+            st.write("% Similitud: ", int(100- 17.14*distance))
     
         else:
             st.write(
