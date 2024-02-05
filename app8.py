@@ -30,7 +30,7 @@ class FaceNetModels:
         distances = [
         (label, path, torch.dist(emb, img_embedding))
         for label, (path, emb) in self.caracteristicas.items()
-    ]
+        ]
         sorted_distances = sorted(distances, key=lambda x: x[2])
         return sorted_distances
 
@@ -53,8 +53,8 @@ class FaceNetModels:
 
             embeddings_list.append(self.model(face.unsqueeze(0)))
             labels.append(label)
-            path_uploaded_files.append(uploaded_file)
-
+            path_uploaded_files.append(os.path(uploaded_file))
+            os.path(uploaded_file)    
         self.caracteristicas = dict(zip(labels, zip(path_uploaded_files, embeddings_list)))
 
         st.write(f"Se procesaron {len(embeddings_list)} imágenes.")
