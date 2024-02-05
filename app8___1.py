@@ -28,20 +28,19 @@ class FaceNetModels:
 
     def Distancia(self, img_embedding):
         distances = [
-        (label, path, torch.dist(emb, img_embedding))
-        for label, (path, emb) in self.caracteristicas.items()
+            (label, torch.dist(emb, img_embedding))
+            for label, emb in self.caracteristicas.items()
         ]
-        sorted_distances = sorted(distances, key=lambda x: x[2])
-        return sorted_distances
-
+        sorted_distances = sorted(distances, key=lambda x: x[1])
+        return sorted_distances[0][0], sorted_distances[0][1].item()
 
     def extract_embeddings(self, uploaded_files):
         embeddings_list = []
         labels = []
         no_process_images = []
-        path_uploaded_files = []
 
         for uploaded_file in uploaded_files:
+            
             img = Image.open(uploaded_file)
             img = img.convert("RGB")
             label = os.path.splitext(uploaded_file.name)[0]
@@ -54,21 +53,13 @@ class FaceNetModels:
             embeddings_list.append(self.model(face.unsqueeze(0)))
             labels.append(label)
 
-            # Guardar temporalmente el archivo y obtener la ruta completa
-            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as temp_img:
-                temp_img_path = temp_img.name
-                img.save(temp_img_path)
-                path_uploaded_files.append(temp_img_path)
-
-        self.caracteristicas = dict(zip(labels, zip(path_uploaded_files, embeddings_list)))
-
+        self.caracteristicas = dict(zip(labels, embeddings_list))
         st.write(f"Se procesaron {len(embeddings_list)} imágenes.")
 
         if no_process_images:
             st.warning(f"No se pudieron procesar {len(no_process_images)} imágenes.")
 
         return self.caracteristicas
-
 
 def feature_extraction(uploaded_files):
     _models = FaceNetModels()
@@ -89,8 +80,6 @@ def feature_extraction(uploaded_files):
         except Exception as e:
             st.error("Ocurrió un error. Detalles: " + str(e))
 
-
-
 def upload_and_process_image(uploaded_file, pkl_file):
     try:
         _models = FaceNetModels()
@@ -101,7 +90,6 @@ def upload_and_process_image(uploaded_file, pkl_file):
             pkl_file_path = temp_pkl.name
 
         _models.load_caracteristicas(pkl_file_path)
-    
 
         img = Image.open(io.BytesIO(uploaded_file.read()))
 
@@ -115,12 +103,11 @@ def upload_and_process_image(uploaded_file, pkl_file):
         image_embedding = _models.embedding(_models.mtcnn(img))
 
         result = _models.Distancia(image_embedding)
-        st.json({"Resultado": result})
         if result:
+            label, distance = result
             st.image(img, width=200)
-            st.write("La imagen cargada puede ser de:", result[0][0])
-            st.write("patch:", result[0][1])
-            st.write("% Similitud: ", int(100- 17.14*result[0][2].item()))
+            st.write("La imagen cargada puede ser de:", label)
+            st.write("% Similitud: ", int(100- 17.14*distance))
     
         else:
             st.write(
@@ -153,7 +140,7 @@ if option == "Generar características":
     uploaded_files = st.file_uploader("Cargar imágenes", accept_multiple_files=True)
     feature_extraction(uploaded_files)
 elif option == "Cargar diccionario y reconocer":
-   
+    # data_dir = st.sidebar.text_input("Directorio de trabajo")
     pkl_file = st.file_uploader("Cargar archivo .pkl")
     uploaded_file = st.file_uploader("Cargar imagen a reconocer")
     if pkl_file and uploaded_file:
