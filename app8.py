@@ -53,7 +53,7 @@ class FaceNetModels:
 
             embeddings_list.append(self.model(face.unsqueeze(0)))
             labels.append(label)
-            path_uploaded_files.append(uploaded_file.name)
+            path_uploaded_files.append(uploaded_file)
 
         self.caracteristicas = dict(zip(labels, zip(path_uploaded_files, embeddings_list)))
 
