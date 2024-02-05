@@ -32,7 +32,7 @@ class FaceNetModels:
             for label, emb in self.caracteristicas.items()
         ]
         sorted_distances = sorted(distances, key=lambda x: x[1])
-        return sorted_distances
+        return sorted_distances[0][0], sorted_distances[0][1].item()
 
     def extract_embeddings(self, uploaded_files):
         embeddings_list = []
@@ -104,9 +104,11 @@ def upload_and_process_image(uploaded_file, pkl_file):
 
         result = _models.Distancia(image_embedding)
         if result:
+            label, distance = result
             st.image(img, width=200)
-            st.write("La imagen cargada puede ser de:", result[0][0])
-            st.write("% Similitud: ", int(100- 17.14*result[0][1].item()))
+            st.write("La imagen cargada puede ser de:", label)
+            st.write("% Similitud: ", int(100- 17.14*distance))
+    
         else:
             st.write(
                 "Algo falló con la imagen proporcionada. Verifica si la imagen tiene una extension valida EJ: luis.jpg"
