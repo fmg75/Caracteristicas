@@ -9,11 +9,48 @@ import uuid
 import base64
 import tempfile
 
-# Generar un ID único utilizando uuid
+# --- Configuración inicial de la página ---
+st.set_page_config(
+    page_title="DeepSeek Chat",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# --- Toggle de tema Claro/Oscuro en la barra lateral ---
+theme = st.sidebar.radio("Seleccionar tema:", ("Claro", "Oscuro"), index=0)
+if theme == "Oscuro":
+    st.markdown(
+        """
+        <style>
+        /* Fondo general */
+        .css-1d391kg {background-color: #0e1117 !important;}
+        /* Texto */
+        body, .css-1d391kg, .css-jn99sy p {color: #fafafa !important;}
+        /* Entradas y botones */
+        .stButton>button, .stFileUploader>div {background-color: #1e1e1e !important; color: #fafafa !important;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        """
+        <style>
+        /* Restablecer tema claro nativo */
+        .css-1d391kg {background-color: #ffffff !important;}
+        body, .css-jn99sy p {color: #000000 !important;}
+        .stButton>button, .stFileUploader>div {background-color: #f0f2f6 !important; color: #000000 !important;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# --- Generador de ID único para descargas ---
 unique_id = str(uuid.uuid4())[:8]
 
 class FaceNetModels:
     def __init__(self):
+        # Cargar modelo preentrenado y detector MTCNN
         self.model = InceptionResnetV1(pretrained="vggface2").eval()
         self.mtcnn = MTCNN(min_face_size=50, keep_all=False)
         self.caracteristicas = None
@@ -23,125 +60,82 @@ class FaceNetModels:
             self.caracteristicas = pickle.load(f)
 
     def embedding(self, img_tensor):
-        img_embedding = self.model(img_tensor.unsqueeze(0))
-        return img_embedding
+        return self.model(img_tensor.unsqueeze(0))
 
     def Distancia(self, img_embedding):
         distances = [
             (label, torch.dist(emb, img_embedding))
             for label, emb in self.caracteristicas.items()
         ]
-        sorted_distances = sorted(distances, key=lambda x: x[1])
-        return sorted_distances[0][0], sorted_distances[0][1].item()
+        label, dist = min(distances, key=lambda x: x[1])
+        return label, dist.item()
 
     def extract_embeddings(self, uploaded_files):
-        embeddings_list = []
-        labels = []
-        no_process_images = []
-
-        for uploaded_file in uploaded_files:
-            
-            img = Image.open(uploaded_file)
-            img = img.convert("RGB")
-            label = os.path.splitext(uploaded_file.name)[0]
+        embeddings_list, labels, no_process = [], [], []
+        for f in uploaded_files:
+            img = Image.open(f).convert("RGB")
             face = self.mtcnn(img)
-
             if face is None:
-                no_process_images.append(uploaded_file.name)
+                no_process.append(f.name)
                 continue
-
             embeddings_list.append(self.model(face.unsqueeze(0)))
-            labels.append(label)
-
+            labels.append(os.path.splitext(f.name)[0])
         self.caracteristicas = dict(zip(labels, embeddings_list))
-        st.write(f"Se procesaron {len(embeddings_list)} imágenes.")
-
-        if no_process_images:
-            st.warning(f"No se pudieron procesar {len(no_process_images)} imágenes.")
-
+        st.success(f"Procesadas: {len(embeddings_list)} imágenes.")
+        if no_process:
+            st.warning(f"No procesadas: {', '.join(no_process)}")
         return self.caracteristicas
 
+# --- Función para extracción de características ---
 def feature_extraction(uploaded_files):
-    _models = FaceNetModels()
+    models = FaceNetModels()
     if st.button("Extraer características"):
-        try:
-            caracteristicas = _models.extract_embeddings(uploaded_files)
-            filename = f"feature_{unique_id}.pkl"
+        caracteristicas = models.extract_embeddings(uploaded_files)
+        fname = f"features_{unique_id}.pkl"
+        with open(fname, "wb") as out:
+            pickle.dump(caracteristicas, out)
+        with open(fname, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+            href = f'<a href="data:application/octet-stream;base64,{b64}" download="{fname}">Descargar .pkl</a>'
+        st.markdown(href, unsafe_allow_html=True)
 
-            with open(filename, "wb") as f:
-                pickle.dump(caracteristicas, f)
-
-            with open(filename, "rb") as file:
-                contents = file.read()
-                base64_encoded = base64.b64encode(contents).decode("utf-8")
-                download_path = f"data:application/octet-stream;base64,{base64_encoded}"
-                href = f'<a href="{download_path}" download="feature_{unique_id}.pkl">Descargar Características</a>'
-            st.markdown(href, unsafe_allow_html=True)
-        except Exception as e:
-            st.error("Ocurrió un error. Detalles: " + str(e))
-
+# --- Función para reconocimiento facial ---
 def upload_and_process_image(uploaded_file, pkl_file):
     try:
-        _models = FaceNetModels()
-
-        # Guardar el archivo .pkl en una ruta temporal
-        with tempfile.NamedTemporaryFile(suffix=".pkl", delete=False) as temp_pkl:
-            temp_pkl.write(pkl_file.read())
-            pkl_file_path = temp_pkl.name
-
-        _models.load_caracteristicas(pkl_file_path)
-
+        models = FaceNetModels()
+        # Guardar .pkl temporalmente
+        tmp = tempfile.NamedTemporaryFile(suffix='.pkl', delete=False)
+        tmp.write(pkl_file.read())
+        tmp.close()
+        models.load_caracteristicas(tmp.name)
         img = Image.open(io.BytesIO(uploaded_file.read()))
-
         if img.format == "PNG":
-            jpg_io = io.BytesIO()
-            img = img.convert("RGB")
-            img.save(jpg_io, format="JPEG")
-            jpg_io.seek(0)
-            img = Image.open(jpg_io)
-
-        image_embedding = _models.embedding(_models.mtcnn(img))
-
-        result = _models.Distancia(image_embedding)
-        if result:
-            label, distance = result
-            st.image(img, width=200)
-            st.write("La imagen cargada puede ser de:", label)
-            st.write("% Similitud: ", int(100- 17.14*distance))
-    
-        else:
-            st.write(
-                "Algo falló con la imagen proporcionada. Verifica si la imagen tiene una extension valida EJ: luis.jpg"
-                + "O si el mismo ha sido generado previamente.")
-
+            buf = io.BytesIO()
+            img.convert("RGB").save(buf, format="JPEG")
+            buf.seek(0)
+            img = Image.open(buf)
+        face_tensor = models.mtcnn(img)
+        if face_tensor is None:
+            st.error("No se detectó rostro en la imagen proporcionada.")
+            return
+        emb = models.embedding(face_tensor)
+        label, dist = models.Distancia(emb)
+        st.image(img, width=200)
+        similarity = max(0, int(100 - 17.14 * dist))
+        st.write(f"Posible: **{label}** (Similitud: {similarity}%)")
     except Exception as e:
-        print("Error en upload_and_process_image:", str(e))
-        return None
+        st.error(f"Error: {e}")
 
-# Interface lateral
-expander = st.expander("Información de la App")
-with expander:
-    st.write(
-    "Esta es una aplicación de reconocimiento facial.")
-    st.write(
-    "Permite extraer características faciales, guardarlas en un archivo (diccionario con extencion .pkl) y luego reconocer el rostro en una imagen.")
-    st.write(
-    "Para generar características faciales, selecciona la opción 'Generar características' en el menú lateral.")
-    st.write(
-    "El conjunto de imagenes seleccionadas debe ser del tipo: Juan.jpg, Laura.jpeg, etc..")
-    st.write(
-    "Una vez generadas las características, puedes cargar el diccionario .pkl y una imagen para realizar el reconocimiento facial.")
+# --- Barra lateral e interfaz principal ---
+st.sidebar.title("Opciones")
+mode = st.sidebar.selectbox("Menú:", ["Generar características", "Reconocer rostro"])
 
-option = st.sidebar.selectbox(
-    "Seleccione una opción:",
-    ("Generar características", "Cargar diccionario y reconocer"),)
-
-if option == "Generar características":
-    uploaded_files = st.file_uploader("Cargar imágenes", accept_multiple_files=True)
-    feature_extraction(uploaded_files)
-elif option == "Cargar diccionario y reconocer":
-    # data_dir = st.sidebar.text_input("Directorio de trabajo")
-    pkl_file = st.file_uploader("Cargar archivo .pkl")
-    uploaded_file = st.file_uploader("Cargar imagen a reconocer")
-    if pkl_file and uploaded_file:
-        upload_and_process_image(uploaded_file, pkl_file)
+if mode == "Generar características":
+    files = st.file_uploader("Subir imágenes (JPEG/PNG)", type=['jpg','jpeg','png'], accept_multiple_files=True)
+    if files:
+        feature_extraction(files)
+else:
+    uploaded = st.file_uploader("Subir imagen a reconocer", type=['jpg','jpeg','png'])
+    pkl = st.file_uploader("Subir diccionario .pkl", type=['pkl'])
+    if uploaded and pkl:
+        upload_and_process_image(uploaded, pkl)
