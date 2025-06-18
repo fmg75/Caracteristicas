@@ -1,6 +1,6 @@
 streamlit>=1.46.0
-torch>=2.0.0  # Actualizar a versión más reciente
-facenet_pytorch>=2.5.2
+torch>=2.0.0
+torchvision>=0.15.0
+facenet-pytorch>=2.5.2
+Pillow>=9.0.0
 numpy>=1.21.0
-pickle5>=0.0.11
-dill>=0.3.6S
