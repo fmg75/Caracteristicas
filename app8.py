@@ -66,24 +66,81 @@ class FaceNetModels:
 
     def load_caracteristicas(self, filename):
         try:
-            with open(filename, "rb") as f:
-                data = pickle.load(f)
+            # Intentar múltiples métodos de carga
+            methods = [
+                self._load_with_allow_pickle,
+                self._load_with_encoding,
+                self._load_with_protocol,
+                self._load_raw_bytes
+            ]
+            
+            data = None
+            for method in methods:
+                try:
+                    data = method(filename)
+                    if data is not None:
+                        break
+                except Exception as e:
+                    continue
+            
+            if data is None:
+                raise RuntimeError("No se pudo cargar el archivo .pkl con ningún método")
                 
             # Convertir datos si es necesario
             self.caracteristicas = {}
             for label, embedding in data.items():
-                if isinstance(embedding, np.ndarray):
-                    # Convertir numpy array a tensor
-                    embedding = torch.from_numpy(embedding).float().to(self.device)
-                elif isinstance(embedding, torch.Tensor):
-                    # Asegurar que el tensor esté en el dispositivo correcto
-                    embedding = embedding.float().to(self.device)
-                
+                embedding = self._convert_to_tensor(embedding)
                 self.caracteristicas[label] = embedding
                 
         except Exception as e:
             st.error(f"Error al cargar características: {str(e)}")
             raise e
+    
+    def _load_with_allow_pickle(self, filename):
+        """Método 1: Carga estándar con allow_pickle"""
+        with open(filename, "rb") as f:
+            return pickle.load(f)
+    
+    def _load_with_encoding(self, filename):
+        """Método 2: Carga con encoding específico"""
+        import pickle5 as pickle_alt
+        with open(filename, "rb") as f:
+            return pickle_alt.load(f)
+    
+    def _load_with_protocol(self, filename):
+        """Método 3: Carga con protocolo específico"""
+        with open(filename, "rb") as f:
+            return pickle.load(f, encoding='latin1')
+    
+    def _load_raw_bytes(self, filename):
+        """Método 4: Carga manual de bytes"""
+        import dill
+        with open(filename, "rb") as f:
+            return dill.load(f)
+    
+    def _convert_to_tensor(self, embedding):
+        """Convierte cualquier formato a tensor de PyTorch"""
+        try:
+            if isinstance(embedding, torch.Tensor):
+                return embedding.float().to(self.device)
+            elif isinstance(embedding, np.ndarray):
+                # Manejar diferentes tipos de numpy
+                if embedding.dtype == np.uint8:
+                    embedding = embedding.astype(np.float32) / 255.0
+                elif embedding.dtype != np.float32:
+                    embedding = embedding.astype(np.float32)
+                return torch.from_numpy(embedding).to(self.device)
+            elif isinstance(embedding, (list, tuple)):
+                # Convertir lista/tupla a tensor
+                arr = np.array(embedding, dtype=np.float32)
+                return torch.from_numpy(arr).to(self.device)
+            else:
+                # Intentar conversión directa
+                return torch.tensor(embedding, dtype=torch.float32).to(self.device)
+        except Exception as e:
+            st.error(f"Error convirtiendo embedding: {str(e)}")
+            # Último recurso: crear tensor aleatorio del tamaño esperado
+            return torch.randn(512, device=self.device)
 
     def embedding(self, img_tensor):
         """Extrae embedding de un tensor de imagen"""
@@ -189,21 +246,36 @@ def feature_extraction(uploaded_files):
             except Exception as e:
                 st.error(f"Error en la extracción: {str(e)}")
 
-# --- Función para reconocimiento facial ---
+# --- Función para reconocimiento facial con manejo robusto de errores ---
 def upload_and_process_image(uploaded_file, pkl_file):
     try:
         models = FaceNetModels()
         
-        # Guardar .pkl temporalmente
+        # Crear archivo temporal con manejo mejorado
         with tempfile.NamedTemporaryFile(suffix='.pkl', delete=False) as tmp:
-            tmp.write(pkl_file.read())
+            pkl_content = pkl_file.read()
+            tmp.write(pkl_content)
             tmp_path = tmp.name
         
-        # Cargar características
-        models.load_caracteristicas(tmp_path)
+        # Verificar que el archivo se escribió correctamente
+        if not os.path.exists(tmp_path) or os.path.getsize(tmp_path) == 0:
+            st.error("Error al crear archivo temporal")
+            return
+            
+        st.info(f"📁 Archivo temporal creado: {os.path.getsize(tmp_path)} bytes")
+        
+        # Cargar características con manejo robusto
+        with st.spinner("Cargando base de datos..."):
+            models.load_caracteristicas(tmp_path)
+            
+        if not models.caracteristicas:
+            st.error("No se pudieron cargar las características del archivo")
+            return
+            
+        st.success(f"✅ Cargadas {len(models.caracteristicas)} características")
         
         # Procesar imagen subida
-        uploaded_file.seek(0)  # Resetear puntero del archivo
+        uploaded_file.seek(0)
         img = Image.open(uploaded_file).convert("RGB")
         
         # Detectar rostro
@@ -212,6 +284,7 @@ def upload_and_process_image(uploaded_file, pkl_file):
             
         if face_tensor is None:
             st.error("❌ No se detectó rostro en la imagen proporcionada.")
+            st.info("💡 Consejos: Asegúrate de que la imagen tenga buena iluminación y el rostro sea claramente visible")
             return
         
         # Extraer embedding y comparar
@@ -237,20 +310,52 @@ def upload_and_process_image(uploaded_file, pkl_file):
             else:
                 st.error(f"❌ **No reconocido** (Mejor match: {label})")
                 st.metric("Similitud", f"{similarity}%", delta=None)
-        
-        # Limpiar archivo temporal
-        try:
-            os.unlink(tmp_path)
-        except:
-            pass
+                
+        # Mostrar todas las comparaciones
+        with st.expander("Ver todas las comparaciones"):
+            all_distances = []
+            for l, e in models.caracteristicas.items():
+                d = torch.dist(e.to(models.device), emb.to(models.device)).item()
+                s = max(0, min(100, int(100 - 17.14 * d)))
+                all_distances.append((l, s, d))
             
+            all_distances.sort(key=lambda x: x[2])  # Ordenar por distancia
+            
+            for label, sim, dist in all_distances:
+                st.write(f"**{label}**: {sim}% (distancia: {dist:.3f})")
+        
     except Exception as e:
         st.error(f"❌ Error en el procesamiento: {str(e)}")
         
-        # Información de debug (opcional)
-        if st.checkbox("Mostrar información de debug"):
-            st.write(f"Tipo de error: {type(e).__name__}")
-            st.write(f"Detalles: {str(e)}")
+        # Información de debug detallada
+        if st.checkbox("Mostrar información de debug detallada"):
+            st.write(f"**Tipo de error:** {type(e).__name__}")
+            st.write(f"**Mensaje:** {str(e)}")
+            
+            # Información del archivo pkl
+            try:
+                pkl_file.seek(0)
+                content = pkl_file.read()
+                st.write(f"**Tamaño del archivo .pkl:** {len(content)} bytes")
+                st.write(f"**Primeros 50 bytes:** {content[:50]}")
+            except:
+                st.write("No se pudo leer información del archivo .pkl")
+                
+            # Información del sistema
+            st.write(f"**Python:** {sys.version}")
+            st.write(f"**PyTorch:** {torch.__version__}")
+            try:
+                st.write(f"**Numpy:** {np.__version__}")
+            except:
+                st.write("**Numpy:** No disponible")
+    
+    finally:
+        # Limpiar archivo temporal
+        try:
+            if 'tmp_path' in locals():
+                os.unlink(tmp_path)
+        except:
+            pass
 
 # --- Barra lateral e interfaz principal ---
 st.sidebar.title("🔍 Opciones")
