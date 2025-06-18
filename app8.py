@@ -1,5 +1,4 @@
 import os
-import io
 import streamlit as st
 from PIL import Image
 import torch
@@ -9,6 +8,7 @@ import uuid
 import base64
 import tempfile
 import numpy as np
+import sys
 
 # --- Configuración inicial de la página ---
 st.set_page_config(
